@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLO26 Görüntü Analiz Paneli</title>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #f8fafc; }
+        .container { max-width: 1100px; margin: 40px auto; background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); border: 1px solid #334155; }
+        h1 { text-align: center; color: #38bdf8; font-size: 2.2rem; margin-bottom: 5px; font-weight: 800; letter-spacing: -0.5px; }
+        .subtitle { text-align: center; color: #94a3b8; margin-bottom: 40px; font-size: 1rem; }
+        .upload-section { border: 2px dashed #0284c7; padding: 40px 20px; text-align: center; border-radius: 12px; background-color: #1e293b; cursor: pointer; transition: all 0.3s ease; }
+        .upload-section:hover { background-color: #0f172a; border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
+        #fileInput { display: none; }
+        .preview-container { display: grid; grid-template-columns: 1fr 1fr; margin-top: 40px; gap: 30px; display: none; }
+        .img-box { background: #0f172a; padding: 15px; border-radius: 10px; border: 1px solid #334155; text-align: center; }
+        .img-box img { max-width: 100%; height: auto; border-radius: 6px; margin-top: 10px; }
+        .img-box h3 { color: #f1f5f9; margin: 5px 0; font-size: 1.1rem; }
+        .results-box { margin-top: 40px; padding: 25px; background: #0f172a; border-left: 5px solid #38bdf8; border-radius: 8px; border-top: 1px solid #334155; border-right: 1px solid #334155; border-bottom: 1px solid #334155; display: none; }
+        .object-tag { display: inline-block; background: #0369a1; color: #e0f2fe; padding: 6px 14px; border-radius: 30px; margin: 6px; font-weight: 600; font-size: 14px; border: 1px solid #0284c7; }
+        .error { color: #f87171; font-weight: bold; text-align: center; margin-top: 20px; padding: 12px; background: rgba(248, 113, 113, 0.1); border-radius: 6px; border: 1px solid rgba(248, 113, 113, 0.2); display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>YOLO26 Yapay Zeka Analiz Paneli</h1>
+    <div class="subtitle">Ultralytics YOLO26 Model Arayüzü</div>
+
+    <div class="upload-section" onclick="document.getElementById('fileInput').click()">
+        <p style="font-size: 18px; margin: 0; color: #38bdf8; font-weight: 600;">Görsel Yüklemek veya Seçmek İçin Tıklayın</p>
+        <p style="margin: 8px 0 0 0; color: #64748b; font-size: 14px;">Desteklenen formatlar: PNG, JPG, JPEG</p>
+        <input type="file" id="fileInput" accept="image/*" onchange="uploadImage()">
+    </div>
+
+    <div id="errorMsg" class="error"></div>
+
+    <div id="previewContainer" class="preview-container">
+        <div class="img-box">
+            <h3>Orijinal Resim</h3>
+            <img id="originalImg" src="" alt="Orijinal">
+        </div>
+        <div class="img-box">
+            <h3>YOLO26 Segmentasyon Çıktısı</h3>
+            <img id="processedImg" src="" alt="İşlenmiş">
+        </div>
+    </div>
+
+    <div id="resultsBox" class="results-box">
+        <h3 style="margin-top: 0; color: #38bdf8;">YOLO26 Tarafından Algılanan Nesneler:</h3>
+        <div id="objectList"></div>
+    </div>
+</div>
+
+<script>
+function uploadImage() {
+    const fileInput = document.getElementById('fileInput');
+    const errorMsg = document.getElementById('errorMsg');
+    const previewContainer = document.getElementById('previewContainer');
+    const resultsBox = document.getElementById('resultsBox');
+
+    if (!fileInput.files || fileInput.files.length === 0) return;
+
+    errorMsg.style.display = 'none';
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json().then(data => ({ status: response.status, body: data })))
+    .then(res => {
+        if (res.status !== 200) {
+            throw new Error(res.body.error || 'İşlem sırasında bir sorun oluştu.');
+        }
+
+        document.getElementById('originalImg').src = res.body.original_image;
+        document.getElementById('processedImg').src = res.body.processed_image;
+        previewContainer.style.display = 'grid';
+
+        const objectList = document.getElementById('objectList');
+        objectList.innerHTML = '';
+
+        if (!res.body.objects || res.body.objects.length === 0) {
+            objectList.innerHTML = '<p style="color: #94a3b8;">Görselde herhangi bir sınıf tespit edilemedi.</p>';
+        } else {
+            res.body.objects.forEach(obj => {
+                const span = document.createElement('span');
+                span.className = 'object-tag';
+                span.innerText = `${obj.class} (%${(obj.confidence * 100).toFixed(0)})`;
+                objectList.appendChild(span);
+            });
+        }
+        resultsBox.style.display = 'block';
+    })
+    .catch(err => {
+        errorMsg.innerText = err.message;
+        errorMsg.style.display = 'block';
+        previewContainer.style.display = 'none';
+        resultsBox.style.display = 'none';
+    });
+}
+</script>
+
+</body>
+</html>
